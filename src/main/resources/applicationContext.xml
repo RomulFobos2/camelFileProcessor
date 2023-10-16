@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:camel="http://camel.apache.org/schema/spring"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+       http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd">
+
+    <context:property-placeholder location="classpath:application.properties"/>
+
+    <camel:camelContext id="camelContext" xmlns="http://camel.apache.org/schema/spring">
+        <camel:routeBuilder ref="fileRoute"/>
+    </camel:camelContext>
+
+    <bean id="fileRoute" class="com.tander.camelFileProcessor.routes.FileRoute">
+        <constructor-arg value="${activemq.queue.XMLFiles}"/>
+        <constructor-arg value="${activemq.queue.TXTFiles}"/>
+        <constructor-arg value="${activemq.queue.UnknownFiles}"/>
+        <constructor-arg value="${files.directory}"/>
+    </bean>
+
+    <bean id="jmsConnectionFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
+        <constructor-arg value="${spring.activemq.user}"/>
+        <constructor-arg value="${spring.activemq.password}"/>
+        <constructor-arg value="${spring.activemq.broker-url}"/>
+    </bean>
+
+    <bean id="jmsConfig" class="org.apache.camel.component.jms.JmsConfiguration">
+        <property name="connectionFactory" ref="jmsConnectionFactory"/>
+        <property name="concurrentConsumers" value="1"/>
+        <property name="maxConcurrentConsumers" value="10"/>
+        <property name="acknowledgementModeName" value="${producer.sessionMode}"/>
+        <property name="transacted" value="${producer.isTransaction}"/>
+    </bean>
+
+    <bean id="jmsSenderToBroker" class="org.apache.camel.component.jms.JmsComponent">
+        <property name="configuration" ref="jmsConfig"/>
+    </bean>
+
+    <bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+        <property name="driverClassName" value="com.mysql.cj.jdbc.Driver"/>
+        <property name="url" value="${db.urlDB}"/>
+        <property name="username" value="${db.usernameDB}"/>
+        <property name="password" value="${db.passwordDB}"/>
+    </bean>
+
+    <bean id="dataSourceInitializer" class="org.springframework.jdbc.datasource.init.DataSourceInitializer">
+        <property name="dataSource" ref="dataSource"/>
+        <property name="databasePopulator">
+            <bean class="org.springframework.jdbc.datasource.init.ResourceDatabasePopulator">
+                <property name="scripts">
+                    <list>
+                        <value>classpath:schema.sql</value>
+                    </list>
+                </property>
+            </bean>
+        </property>
+    </bean>
+
+    <bean id="messageProcessor" class="com.tander.camelFileProcessor.processor.MessageProcessor">
+        <constructor-arg ref="mailService"/>
+        <constructor-arg value="${mail.countFilesForSend}"/>
+    </bean>
+
+    <bean id="DatabaseProcessor" class="com.tander.camelFileProcessor.processor.DatabaseProcessor"
+          destroy-method="save">
+        <constructor-arg ref="dataSource"/>
+        <constructor-arg value="${db.batchSize}" type="int"/>
+        <constructor-arg value="${db.sql.insert}"/>
+    </bean>
+
+    <bean id="javaMailSenderImplBean" class="org.springframework.mail.javamail.JavaMailSenderImpl">
+        <property name="host" value="${mail.host}"/>
+        <property name="port" value="#{T(java.lang.Integer).parseInt('${mail.port}')}"/>
+        <property name="username" value="${mail.username}"/>
+        <property name="password" value="${mail.password}"/>
+        <property name="protocol" value="${mail.protocol}"/>
+    </bean>
+
+    <bean id="mailService" class="com.tander.camelFileProcessor.service.MailService">
+        <constructor-arg ref="javaMailSenderImplBean"/>
+    </bean>
+
+</beans>

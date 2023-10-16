@@ -1,0 +1,1 @@
+Create TABLE IF NOT EXISTS messages_camel(message_id INT PRIMARY KEY AUTO_INCREMENT, body_message VARCHAR(100));
