@@ -9,7 +9,6 @@ public class CamelFileProcessorApplication {
 
 	public static void main(String[] args) throws InterruptedException {
 		ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
-		//DatabaseProcessor databaseProcessor = context.getBean(DatabaseProcessor.class);
 		Thread.sleep(15000);
 		context.close();
 	}

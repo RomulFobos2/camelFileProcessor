@@ -1,5 +1,6 @@
 package com.tander.camelFileProcessor.processor;
 
+import bitronix.tm.BitronixTransactionManager;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -9,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import javax.transaction.*;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -26,36 +28,46 @@ public class DatabaseProcessor implements Processor {
     private int batchSize;
     String sqlInsertTXTMessage;
 
+    BitronixTransactionManager transactionManager;
+
     @Override
     public void process(Exchange exchange){
         dataMessages.add(exchange.getIn().getBody(String.class));
         logger.info("Message added to package.");
         if (dataMessages.size() > batchSize){
-            save();
+            saveToDB();
         }
     }
 
-    public void save(){
+    public void saveToDB(){
         logger.info("Save to db...");
-        try (Connection connection = dataSource.getConnection()) {
-            connection.setAutoCommit(false);
-            try(PreparedStatement preparedStatement = connection.prepareStatement(sqlInsertTXTMessage)) {
-                for (String dataToSave : dataMessages) {
-                    preparedStatement.setString(1, dataToSave);
-                    preparedStatement.addBatch();
+        try {
+            transactionManager.begin();
+            try (Connection connection = dataSource.getConnection()) {
+                try(PreparedStatement preparedStatement = connection.prepareStatement(sqlInsertTXTMessage)) {
+                    for (String dataToSave : dataMessages) {
+                        preparedStatement.setString(1, dataToSave);
+                        preparedStatement.addBatch();
+                    }
+                    preparedStatement.executeBatch();
+                    transactionManager.commit();
+                    dataMessages.clear();
+                    logger.info("Save to db success.");
                 }
-                preparedStatement.executeBatch();
-                connection.commit();
-                dataMessages.clear();
-                logger.info("Save to db success.");
-            }
-            catch (SQLException e){
-                connection.rollback();
-                logger.error("Error while save to DB: ", e);
             }
         }
         catch (SQLException e){
-            logger.error("Error while create connect to DB: ", e);
+            try {
+                transactionManager.rollback();
+            }
+            catch (SystemException se){
+                logger.error("Error rolling back transaction: ", e);
+            }
+            logger.error("Error while save to DB: ", e);
+        }
+        catch (NotSupportedException | SystemException | RollbackException | HeuristicMixedException |
+               HeuristicRollbackException e) {
+            logger.error("Error while managing transaction: ", e);
         }
     }
 }

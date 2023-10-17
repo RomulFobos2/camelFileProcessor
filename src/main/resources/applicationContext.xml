@@ -66,10 +66,11 @@
     </bean>
 
     <bean id="DatabaseProcessor" class="com.tander.camelFileProcessor.processor.DatabaseProcessor"
-          destroy-method="save">
+          destroy-method="saveToDB">
         <constructor-arg ref="dataSource"/>
         <constructor-arg value="${db.batchSize}" type="int"/>
         <constructor-arg value="${db.sql.insert}"/>
+        <constructor-arg ref="bitronixTransactionManagerBean"/>
     </bean>
 
     <bean id="javaMailSenderImplBean" class="org.springframework.mail.javamail.JavaMailSenderImpl">
@@ -83,5 +84,12 @@
     <bean id="mailService" class="com.tander.camelFileProcessor.service.MailService">
         <constructor-arg ref="javaMailSenderImplBean"/>
     </bean>
+
+    <bean id="btmConfig" factory-method="getConfiguration" class="bitronix.tm.TransactionManagerServices">
+        <property name="serverId" value="spring-btm" />
+    </bean>
+
+    <bean id="bitronixTransactionManagerBean" factory-method="getTransactionManager"
+          class="bitronix.tm.TransactionManagerServices" depends-on="btmConfig"/>
 
 </beans>

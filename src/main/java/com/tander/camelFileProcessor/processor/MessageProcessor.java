@@ -51,7 +51,7 @@ public class MessageProcessor implements Processor {
             }
         }
         if (current_ProcessedFile >= countFilesForSend){
-            long work_time = (startTime - System.currentTimeMillis())/1000;
+            long work_time = (System.currentTimeMillis() -startTime)/1000;
             String textLetter = mailService.createLetter(current_ProcessedFile, count_XMLFile, count_TXTFile, count_UNKNOWFile, work_time);
             mailService.send(textLetter);
         }
